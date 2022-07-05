@@ -10,16 +10,17 @@ using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types.InlineQueryResults;
 using Telegram.Bot.Types.InputFiles;
 using Telegram.Bot.Types.ReplyMarkups;
+using StackExchange.Redis;
 
 namespace AnimeBot.Services
 {
 
     public class UpdateHandler
     {
-        static int Yes = 0;
-        static int t;
-        static int ID = 0;
-        static long[] IDMem = new long[4] { 0, 0, 0, 0 };
+        static int ID_Edit_Message;
+
+        static ConnectionMultiplexer redis = ConnectionMultiplexer.Connect("176.221.1.219:6379");
+        static IDatabase db = redis.GetDatabase();
 
         private readonly ITelegramBotClient _botClient;
         private readonly ILogger<UpdateHandler> _logger;
@@ -69,7 +70,7 @@ namespace AnimeBot.Services
         }
         static async Task HandleMessage(ITelegramBotClient botClient, Message message)
         {
-            if (ID < 1)
+            if (Convert.ToInt32(db.StringGet("Using_Anime")) < 1)
             {
                 if (message.Text == "/Аниме")
                 {
@@ -83,51 +84,67 @@ namespace AnimeBot.Services
                 }
             });
                     await botClient.SendTextMessageAsync(message.Chat.Id, "Смотрим аниме?", replyMarkup: YesNo);
-                    await botClient.SendTextMessageAsync(message.Chat.Id, $"{Yes}/4");
-                    ID++;
+                    await botClient.SendTextMessageAsync(message.Chat.Id, $"{Convert.ToInt32(db.StringGet("Using_Anime"))}/4");
+                    db.StringSet("Using_Anime", 1);
                     return;
                 }
             }
+
+            if (message.Text == "/Сброс")
+            {
+                db.StringSet("Using_Anime", 0);
+                db.StringSet("ID_member0", 0);
+                db.StringSet("ID_member1", 0);
+                db.StringSet("ID_member2", 0);
+                db.StringSet("ID_member3", 0);
+                db.StringSet("Using_Anime", 0);
+            }
+
         }
         static async Task HandleCallbackQuery(ITelegramBotClient botClient, CallbackQuery callbackQuery)
         {
-            if (t == 0)
+            if (ID_Edit_Message == 0)
             {
-                if (callbackQuery.Data != "Да") t = callbackQuery.Message.MessageId + 1;
+                if (callbackQuery.Data != "Да") ID_Edit_Message = callbackQuery.Message.MessageId + 1;
             }
 
-            if (callbackQuery.From.Id == IDMem[0] | callbackQuery.From.Id == IDMem[1] | callbackQuery.From.Id == IDMem[2] | callbackQuery.From.Id == IDMem[3]) ;
+            if (callbackQuery.From.Id == db.StringGet("ID_member0") | callbackQuery.From.Id == db.StringGet("ID_member1") | callbackQuery.From.Id == db.StringGet("ID_member2") | callbackQuery.From.Id == db.StringGet("ID_member3")) ;
 
             else
             {
                 if (callbackQuery.Data == "Нет")
                 {
                     await botClient.SendTextMessageAsync(callbackQuery.Message.Chat.Id, "Не собираемся");
-                    ID = 0;
-                    IDMem = new long[4] { 0, 0, 0, 0 }; ;
-                    Yes = 0;
+                    db.StringSet("Using_Anime", 0);
+                    db.StringSet("ID_member0", 0);
+                    db.StringSet("ID_member1", 0);
+                    db.StringSet("ID_member2", 0);
+                    db.StringSet("ID_member3", 0);
+                    db.StringSet("Using_Anime", 0);
                     if (callbackQuery.Message.Text == "Смотрим аниме?") await botClient.DeleteMessageAsync(callbackQuery.Message.Chat.Id, callbackQuery.Message.MessageId);
                 }
 
                 if (callbackQuery.Data == "Да")
                 {
-                    if (Yes >= 4)
+                    if (Convert.ToInt32(db.StringGet("Using_Anime")) - 1 >= 4)
                     {
-                        Console.WriteLine();
                         await botClient.SendTextMessageAsync(callbackQuery.Message.Chat.Id, "Cобираемся автоботы");
-                        ID = 0;
-                        IDMem = new long[4] { 0, 0, 0, 0 };
-                        Yes = 0;
+                        db.StringSet("Using_Anime", 0);
+                        db.StringSet("ID_member0", 0);
+                        db.StringSet("ID_member1", 0);
+                        db.StringSet("ID_member2", 0);
+                        db.StringSet("ID_member3", 0);
                         if (callbackQuery.Message.Text == "Смотрим аниме?") await botClient.DeleteMessageAsync(callbackQuery.Message.Chat.Id, callbackQuery.Message.MessageId);
-                        await botClient.SendTextMessageAsync(callbackQuery.Message.Chat.Id, "@xomya4ok @Kirinamie @Yui_ezic  @Hilligan");
+                        await botClient.SendTextMessageAsync(callbackQuery.Message.Chat.Id, "@xomya4ok @Kirinamie @Yui_ezic @Hilligan");
                     }
-                    IDMem[Yes] = callbackQuery.From.Id;
-                    Yes++;
-                    if (t == 0) t = callbackQuery.Message.MessageId + 1;
-                    await botClient.EditMessageTextAsync(callbackQuery.Message.Chat.Id, callbackQuery.Message.MessageId = t, $"{Yes}/4");
+                    if (db.StringGet("Using_Anime") == 1) db.StringSet("ID_member0", callbackQuery.From.Id);
+                    if (db.StringGet("Using_Anime") == 2) db.StringSet("ID_member1", callbackQuery.From.Id);
+                    if (db.StringGet("Using_Anime") == 3) db.StringSet("ID_member2", callbackQuery.From.Id);
+                    if (db.StringGet("Using_Anime") == 4) db.StringSet("ID_member3", callbackQuery.From.Id);
+                    db.StringSet("Using_Anime", Convert.ToInt32(db.StringGet("Using_Anime")) + 1);
+                    if (ID_Edit_Message == 0) ID_Edit_Message = callbackQuery.Message.MessageId + 1;
+                    await botClient.EditMessageTextAsync(callbackQuery.Message.Chat.Id, callbackQuery.Message.MessageId = ID_Edit_Message, $"{Convert.ToInt32(db.StringGet("Using_Anime")) - 1}/ 4");
                 }
-
-                ID++;
             }
             return;
         }
