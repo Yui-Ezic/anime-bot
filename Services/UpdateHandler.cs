@@ -10,6 +10,7 @@ using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types.InlineQueryResults;
 using Telegram.Bot.Types.InputFiles;
 using Telegram.Bot.Types.ReplyMarkups;
+using StackExchange.Redis;
 
 namespace AnimeBot.Services
 {
@@ -17,6 +18,9 @@ namespace AnimeBot.Services
     public class UpdateHandler
     {
         static int ID_Edit_Message;
+
+        static ConnectionMultiplexer redis = ConnectionMultiplexer.Connect("176.221.1.219:6379");
+        static IDatabase db = redis.GetDatabase();
 
         private readonly ITelegramBotClient _botClient;
         private readonly ILogger<UpdateHandler> _logger;
